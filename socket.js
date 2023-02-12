@@ -92,7 +92,7 @@ const onSocketConnection = (ws) => {
             else{
                 ws.send("failed")
             }
-            //wss.people()
+            wss.people()
         }
         else if(request.type == "offer"){
             wss.Offer(ws, request.id, "offer")
