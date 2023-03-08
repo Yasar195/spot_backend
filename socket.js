@@ -6,129 +6,63 @@ const { v4: uuidv4 } = require('uuid');
 
 const clients = new Set()
 
-wss.broadcast = function(data, sender) {
-    clients.forEach((client) => {
-        if(client.id !== sender.id){
-            client.send(data)
-        }
-    })
-}
-
-const createObject = (ws) => {
-    return {"name": ws.name, "id": ws.id}
-}
-
-wss.people = () => {
-    clients.forEach((paraclient)=> {
-        const people = []
-        clients.forEach((chiclient)=> {
-            if(paraclient !== chiclient){
-                people.push(createObject(chiclient))
-            }
-        })
-        const res = {"type": "people", people : people}
-        paraclient.send(JSON.stringify(res))
-    })
-}
-
-wss.Offer = (sender, receiverId, method) => {
-    clients.forEach(client => {
-        if(client.id === receiverId){
-            if(method === "offer"){
-                client.requests.push(createObject(sender))
-            }
-            else {
-                client.requests.forEach((req, index) => {
-                    if(req.id === createObject(sender).id){
-                        client.requests.splice(index, 1)
-                    }
-                })
-            }
-            const res = {"type": "request", requests: client.requests}
-            client.send(JSON.stringify(res))
-        }
-    })
-}
-
 wss.close = (ws)=> {
     ws.close()
 }
 
-wss.left = (sender) => {
-    clients.forEach((client)=> {
-        client.requests.forEach(req => {
-            if(req.id === sender.id){
-                wss.Offer(sender, client.id, 'cancel')
-            }
-        })
-    })
-}
-
-wss.undoOffer = (receiverId) => {
+wss.people = () => {
     clients.forEach(client => {
-        if(client.id === receiverId){
-            clients.requests
-        }
+        let resObj={}
+        resObj.type = "peerlist"
+        resObj.peers = []
+        client.people.forEach(ws => {
+            resObj.peers.push({name: ws.name, uid:client.id})
+        })
+        client.send(JSON.stringify(resObj))
     })
 }
 
 const onSocketConnection = (ws) => {
 
-    clients.add(ws)
-
-    setTimeout(()=> {
-        wss.close(ws)
-    },1000*60)
-
     ws.on('message', (data)=> {
-        const request = JSON.parse(data.toString())
-        if (request.type == "open"){
-            ws.id = uuidv4(),
-            ws.name = request.name
-            ws.requests = []
-            if(ws.name !== ""){
-                ws.send("success")
+        try{
+            const str = data.toString()
+            const json = JSON.parse(str)
+            if(json.type == "init"){
+                clients.add(ws)
+                ws.name = json.name
+                ws.id = uuidv4()
+                ws.ip = json.ip
+                ws.people = []
+                clients.forEach(client => {
+                    if(client !== ws && ws.ip === client.ip){
+                        client.people.push(ws)
+                        ws.people.push(client)
+                    }
+                })
+                wss.people()
             }
-            else{
-                ws.send("failed")
+
+            if(json.type === "offer"){
+                console.log(json.uid)
             }
-            wss.people()
         }
-        else if(request.type == "offer"){
-            wss.Offer(ws, request.id, "offer")
-        }
-        else if(request.type == "cancel"){
-            wss.Offer(ws, request.id, "cancel")
-        }
-        else if(request.type === "message"){
-            request.name = ws.name
-            wss.broadcast(JSON.stringify(request), ws)
-        }
-        else if(request.type === "reject"){
-            const obj = {
-                "type": "reject",
-                "rejid": ws.id
-            }
-            ws.requests.forEach((req, index) => {
-                if(req.id === request.id){
-                    ws.requests.splice(index, 1)
-                }
-            })
-            clients.forEach(client => {
-                if(client.id === request.id){
-                    client.send(JSON.stringify(obj))
-                }
-            })
-            const res = {"type": "request", requests: ws.requests}
-            ws.send(JSON.stringify(res))
+        catch(err){
+            ws.close()
         }
     })
 
     ws.on('close', ()=> {
-        //wss.broadcast("client disconnected man")
         clients.delete(ws)
+        clients.forEach(client => {
+            client.people = []
+            clients.forEach(pclient => {
+                if(client !== pclient && pclient.ip === client.ip){
+                    client.people.push(pclient)
+                }
+            })
+        })
         wss.people()
-        wss.left(ws)
     })
 }
 
