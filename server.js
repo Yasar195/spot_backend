@@ -7,7 +7,6 @@ const socket = require('./socket.js')
 app.use('/socket', socket)
 
 app.get('/', (req, res)=> {
-    console.log(req.ip)
     res.send({"message": `Your ip address is ${req.ip}`})
 })
 

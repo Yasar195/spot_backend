@@ -16,9 +16,15 @@ wss.people = () => {
         resObj.type = "peerlist"
         resObj.peers = []
         client.people.forEach(ws => {
-            resObj.peers.push({name: ws.name, uid:client.id})
+            resObj.peers.push({name: ws.name, uid:ws.id})
         })
         client.send(JSON.stringify(resObj))
+    })
+}
+
+wss.message = (ws, message) => {
+    ws.people.forEach((peer)=> {
+        peer.send(JSON.stringify(message))
     })
 }
 
@@ -41,6 +47,10 @@ const onSocketConnection = (ws) => {
                     }
                 })
                 wss.people()
+            }
+
+            if(json.type === "message"){
+                wss.message(ws, json)
             }
 
             if(json.type === "offer"){
