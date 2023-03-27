@@ -28,6 +28,19 @@ wss.message = (ws, message) => {
     })
 }
 
+wss.request = (ws, message) => {
+    ws.people.forEach((peer)=> {
+        if(message.data.uid === peer.id){
+            const resObj = {
+                type: "request",
+                name: ws.name,
+                uid: ws.id
+            }
+            peer.send(JSON.stringify(resObj))
+        }
+    })
+}
+
 const onSocketConnection = (ws) => {
 
     ws.on('message', (data)=> {
@@ -51,6 +64,10 @@ const onSocketConnection = (ws) => {
 
             if(json.type === "message"){
                 wss.message(ws, json)
+            }
+
+            if(json.type === "request"){
+                wss.request(ws, json)
             }
 
             if(json.type === "offer"){
