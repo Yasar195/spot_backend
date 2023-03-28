@@ -6,8 +6,24 @@ const { v4: uuidv4 } = require('uuid');
 
 const clients = new Set()
 
-wss.close = (ws)=> {
+wss.close = (ws) => {
     ws.close()
+}
+
+wss.withdraw = (ws, id) => {
+    ws.people.forEach((peer) => {
+        if(peer.id === id){
+            peer.requests.forEach((req, index)=> {
+                if(req.uid === ws.id){
+                    peer.requests.splice(index, 1);
+                    peer.send(JSON.stringify({
+                        type: "request",
+                        requests: peer.requests
+                    }))
+                }
+            })
+        }
+    })
 }
 
 wss.people = () => {
@@ -16,7 +32,7 @@ wss.people = () => {
         resObj.type = "peerlist"
         resObj.peers = []
         client.people.forEach(ws => {
-            resObj.peers.push({name: ws.name, uid:ws.id})
+            resObj.peers.push({name: ws.name, uid:ws.id, sent: false})
         })
         client.send(JSON.stringify(resObj))
     })
@@ -31,10 +47,13 @@ wss.message = (ws, message) => {
 wss.request = (ws, message) => {
     ws.people.forEach((peer)=> {
         if(message.data.uid === peer.id){
-            const resObj = {
-                type: "request",
+            peer.requests.push({
                 name: ws.name,
                 uid: ws.id
+            })
+            const resObj = {
+                type: "request",
+                requests: peer.requests
             }
             peer.send(JSON.stringify(resObj))
         }
@@ -53,6 +72,7 @@ const onSocketConnection = (ws) => {
                 ws.id = uuidv4()
                 ws.ip = json.ip
                 ws.people = []
+                ws.requests = []
                 clients.forEach(client => {
                     if(client !== ws && ws.ip === client.ip){
                         client.people.push(ws)
@@ -68,6 +88,10 @@ const onSocketConnection = (ws) => {
 
             if(json.type === "request"){
                 wss.request(ws, json)
+            }
+
+            if(json.type === "withdraw"){
+                wss.withdraw(ws, json.id)
             }
 
             if(json.type === "offer"){
