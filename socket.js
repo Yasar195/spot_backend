@@ -26,6 +26,28 @@ wss.withdraw = (ws, id) => {
     })
 }
 
+wss.deny = (ws, id) => {
+    ws.requests.forEach((req, index) => {
+        if(req.uid === id){
+            ws.requests.splice(index, 1);
+        }
+    })
+    const resObj = {
+        type: "request",
+        requests: ws.requests
+    }
+    ws.send(JSON.stringify(resObj))
+    clients.forEach(client => {
+        if(client.id === id){
+            const resObj = {
+                type: 'deny',
+                uid: ws.id
+            }
+            client.send(JSON.stringify(resObj))
+        }
+    })
+}
+
 wss.people = () => {
     clients.forEach(client => {
         let resObj={}
@@ -45,6 +67,11 @@ wss.message = (ws, message) => {
 }
 
 wss.request = (ws, message) => {
+    ws.people.forEach(peers => {
+        if(peers.uid === message.data.uid){
+            peers.send = true;
+        }
+    })
     ws.people.forEach((peer)=> {
         if(message.data.uid === peer.id){
             peer.requests.push({
@@ -61,6 +88,10 @@ wss.request = (ws, message) => {
 }
 
 const onSocketConnection = (ws) => {
+
+    setTimeout(()=> {
+        ws.close()
+    }, 1000*60*60)
 
     ws.on('message', (data)=> {
         try{
@@ -94,6 +125,10 @@ const onSocketConnection = (ws) => {
                 wss.withdraw(ws, json.id)
             }
 
+            if(json.type === "deny"){
+                wss.deny(ws, json.uid)
+            }
+
             if(json.type === "offer"){
                 console.log(json.uid)
             }
@@ -106,6 +141,16 @@ const onSocketConnection = (ws) => {
     ws.on('close', ()=> {
         clients.delete(ws)
         clients.forEach(client => {
+            client.requests.forEach((req, index) => {
+                if(req.uid === ws.id){
+                    client.requests.splice(index, 1)
+                }
+            })
+            const resObj = {
+                type: "request",
+                requests: client.requests
+            }
+            client.send(JSON.stringify(resObj))
             client.people = []
             clients.forEach(pclient => {
                 if(client !== pclient && pclient.ip === client.ip){
