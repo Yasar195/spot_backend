@@ -60,9 +60,46 @@ wss.people = () => {
     })
 }
 
+wss.accept = (ws, id) => {
+    const resObj = {
+        type: 'accept',
+        name: ws.name,
+        id: ws.id
+    }
+    clients.forEach(client => {
+        if(client.id === id){
+            client.send(JSON.stringify(resObj))
+        }
+    })
+}
+
 wss.message = (ws, message) => {
     ws.people.forEach((peer)=> {
         peer.send(JSON.stringify(message))
+    })
+}
+
+wss.offer = (ws, obj) => {
+    ws.people.forEach(peer => {
+        if(peer.id === obj.uid){
+            const resObj = {
+                type: "offer",
+                sdp: obj.sdp
+            }
+            peer.send(JSON.stringify(resObj))
+        }
+    })
+}
+
+wss.answer = (ws, obj) => {
+    ws.people.forEach(peer => {
+        if(peer.id === obj.uid){
+            const resObj = {
+                type: "answer",
+                sdp: obj.sdp
+            }
+            peer.send(JSON.stringify(resObj))
+        }
     })
 }
 
@@ -129,8 +166,16 @@ const onSocketConnection = (ws) => {
                 wss.deny(ws, json.uid)
             }
 
+            if(json.type === "accept"){
+                wss.accept(ws, json.uid)
+            }
+
             if(json.type === "offer"){
-                console.log(json.uid)
+                wss.offer(ws, json)
+            }
+
+            if(json.type === "answer"){
+                wss.answer(ws, json)
             }
         }
         catch(err){
