@@ -177,6 +177,32 @@ const onSocketConnection = (ws) => {
             if(json.type === "answer"){
                 wss.answer(ws, json)
             }
+
+            if(json.type === "success"){
+                ws.people.forEach(peer => {
+                    if(peer.id === json.uid){
+                        peer.send(JSON.stringify({
+                            type: "success"
+                        }))
+                        ws.send(JSON.stringify({
+                            type: "success"
+                        }))
+                    }
+                })
+            }
+
+            if(json.type === "error"){
+                ws.people.forEach(peer => {
+                    if(peer.id === json.uid){
+                        peer.send(JSON.stringify({
+                            type: "error"
+                        }))
+                        ws.send(JSON.stringify({
+                            type: "error"
+                        }))
+                    }
+                })
+            }
         }
         catch(err){
             ws.close()
